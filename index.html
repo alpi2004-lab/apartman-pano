@@ -18992,146 +18992,99 @@ button:focus-visible, a:focus-visible, summary:focus-visible, [role="button"]:fo
     yukselt();
 })();
 </script>
+<!-- ===== v145: SAKİN GİRİŞİ + BULUT SENKRON ===== -->
+<style>
+#sakinBtn{position:fixed;left:14px;bottom:14px;z-index:900;padding:10px 16px;border:1px solid rgba(255,255,255,.25);border-radius:12px;background:rgba(6,22,26,.82);color:#fff;font:600 .85rem inherit;cursor:pointer;backdrop-filter:blur(8px)}
+.sk-ov{position:fixed;inset:0;z-index:10000;display:none;align-items:center;justify-content:center;background:rgba(3,12,16,.92);padding:16px;overflow:auto}
+.sk-ov.show{display:flex}
+.sk-card{width:100%;max-width:460px;max-height:92vh;overflow:auto;background:#0b2128;color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:18px;padding:22px}
+.sk-card h3{margin:0 0 12px}.sk-card input,.sk-card select{width:100%;padding:11px;margin:6px 0;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.07);color:#fff;font-size:1rem;box-sizing:border-box}
+.sk-card button{padding:10px 14px;margin:6px 6px 0 0;border:0;border-radius:10px;background:#d4a627;color:#111;font-weight:700;cursor:pointer}
+.sk-card button.g{background:rgba(255,255,255,.12);color:#fff}
+.sk-err{color:#ff8a8a;min-height:1.2em;font-size:.85rem}
+.sk-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:8px 0 14px}
+.sk-m{padding:8px 0;text-align:center;border-radius:8px;font-size:.72rem;background:rgba(255,255,255,.07)}
+.sk-m.o{background:#1f7a4d}.sk-m.b{background:#8a2c2c}.sk-m.k{background:#9a7a16}.sk-m.x{opacity:.45}
+.sk-tbl{width:100%;font-size:.85rem;border-collapse:collapse}.sk-tbl td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.1)}
+</style>
+<button id="sakinBtn" onclick="skAc()">🏠 Sakin Girişi</button>
+<div id="skOv" class="sk-ov"><div class="sk-card" id="skCard"></div></div>
 <script>
-/* ☁️ BULUT SENKRON (Google Apps Script) — v1. Ayar paneli: adresin sonuna #bulut ekle veya Ctrl+Shift+B */
 (function(){
-'use strict';
-var CFG='_bulutCfg', SON='_bulutSon', OTO='_bulutOto', ZAMAN='_bulutZaman';
-var DISLA=/^(_bulut|_dbfSon|_dbfYuklendi|_lastBackup|_backupV|_backupH|_backupReminder|_lcAcik|panelTema|lg[A-Z]|adminSbCollapsed|aidatGorunum|setItem$|getItem$|removeItem$|clear$|key$|length$)/;
-var mesgul=false, tekrar=false, timer=null;
+// Apps Script /exec adresini buraya yazın (sakinler de bunu kullanır):
+var BULUT_URL = '';
+var AYLAR=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function cfg(){try{return JSON.parse(localStorage.getItem('bulutCfg')||'{}')}catch(e){return {}}}
+function url(){return cfg().url||BULUT_URL}
+function api(b){var u=url();if(!u)return Promise.reject(new Error('Bulut adresi tanımlı değil'));
+  return fetch(u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(b)}).then(function(r){return r.json()})}
+function show(h){$('skCard').innerHTML=h;$('skOv').classList.add('show')}
+window.skKapat=function(){$('skOv').classList.remove('show')};
 
-function ls(k){try{return _origLSGet(k)}catch(e){return null}}
-function lw(k,v){try{_origLSSet(k,v)}catch(e){}}
-function cfg(){try{var c=JSON.parse(ls(CFG)||'null');return c&&c.url&&c.token?c:null}catch(e){return null}}
-function tst(m,t){try{if(typeof toast==='function')toast(m,t||'ok');else console.log('[bulut]',m)}catch(e){}}
-function hash(s){var h=5381;for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return s.length+':'+h}
-
-function tumVeri(){
-  var o={},i,k,v;
-  for(i=0;i<localStorage.length;i++){k=localStorage.key(i);if(k)o[k]=localStorage.getItem(k);}
-  try{
-    Object.keys(_arsivCache).concat(Object.keys(_bigCache),Object.keys(localStorage).filter(function(x){return !_idbOnly(x)&&!/^(setItem|getItem|removeItem|clear|key|length)$/.test(x)})).forEach(function(x){
-      if(x&&!(x in o)){v=localStorage.getItem(x);if(v!=null)o[x]=v;}
+/* ---------- SAKİN GİRİŞİ ---------- */
+window.skAc=function(){
+  var opts='';for(var i=1;i<=40;i++)opts+='<option value="'+i+'">Daire '+i+'</option>';
+  show('<h3>🏠 Sakin Girişi</h3><select id="skNo">'+opts+'</select><input id="skPin" type="password" inputmode="numeric" maxlength="6" placeholder="Daire PIN kodu" autocomplete="off"><div class="sk-err" id="skErr"></div><button onclick="skGiris()">Giriş</button><button class="g" onclick="skKapat()">Kapat</button>');
+};
+window.skGiris=function(){
+  var no=+$('skNo').value,pin=$('skPin').value.trim();$('skErr').textContent='Kontrol ediliyor…';
+  api({act:'login',no:no,pin:pin}).then(function(r){
+    if(r.ok)return skGoster(r.snap);
+    $('skErr').textContent=r.err==='kilit'?'Çok fazla hatalı deneme. 10 dk sonra tekrar deneyin.':'Daire no veya PIN hatalı.';
+  }).catch(function(e){$('skErr').textContent=e.message||'Bağlantı hatası'});
+};
+function skGoster(s){
+  var now=new Date(),y0=now.getFullYear(),m0=now.getMonth(),borc=0,borcAy=0,h='';
+  Object.keys(s.yillar).sort().reverse().forEach(function(y){
+    var Y=s.yillar[y],g='';
+    Y.ay.forEach(function(a,m){
+      var gecmis=(+y<y0)||(+y===y0&&m<=m0),c='x',ic='·';
+      if(a.d==='odedi'){c='o';ic='✓'}else if(a.d==='muaf'){c='x';ic='—'}
+      else if(a.d==='kismi'){c='k';ic='⚡'}else if(gecmis){c='b';ic='✗'}
+      if(gecmis&&a.d!=='odedi'&&a.d!=='muaf'){var k=Math.max(0,Y.tutar-(a.n||0));if(k>0){borc+=k;borcAy++}}
+      g+='<div class="sk-m '+c+'">'+AYLAR[m]+'<br>'+ic+'</div>';
     });
-  }catch(e){}
-  Object.keys(o).forEach(function(x){if(DISLA.test(x)||o[x]==null||typeof o[x]!=='string')delete o[x];});
+    h+='<b>'+esc(y)+'</b> · aidat '+esc(Y.tutar)+' ₺<div class="sk-grid">'+g+'</div>';
+  });
+  show('<h3>Daire '+esc(s.no)+' · '+esc(s.isim)+'</h3><p>Toplam borç: <b>'+borc.toLocaleString('tr-TR')+' ₺</b> ('+borcAy+' ay)</p>'+h+'<small>Son güncelleme: '+new Date(s.t).toLocaleString('tr-TR')+'</small><br><button class="g" onclick="skKapat()">Çıkış</button>');
+}
+
+/* ---------- YÖNETİCİ: PIN ÜRET + BULUTA GÖNDER ---------- */
+function pins(){try{return JSON.parse(localStorage.getItem('sakinPinler')||'{}')}catch(e){return {}}}
+function snap(d){
+  var y0=new Date().getFullYear(),o={no:d.no,isim:d.isim,t:Date.now(),yillar:{}};
+  for(var y=y0-2;y<=y0;y++){var t=aidatTutarAl(y),ay=[];
+    for(var m=0;m<12;m++){var k=(aidatVerisiAl(y,m)||{})[d.no]||{};ay.push({d:k.durum||'bekliyor',n:aidatNakitMiktar(k,t)})}
+    o.yillar[y]={tutar:t,ay:ay}}
   return o;
 }
-
-async function postEt(c,islemler){
-  var batch=[],boy=0;
-  async function bosalt(){
-    if(!batch.length)return;
-    var r=await fetch(c.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({t:c.token,islemler:batch})});
-    var j=await r.json();
-    if(!j.ok)throw new Error(j.hata||'sunucu hatası');
-    batch=[];boy=0;
-  }
-  for(var i=0;i<islemler.length;i++){
-    var n=(islemler[i].v||'').length;
-    if(boy+n>900000)await bosalt();
-    batch.push(islemler[i]);boy+=n;
-  }
-  await bosalt();
-}
-
-async function gonder(sessiz){
-  var c=cfg();if(!c){if(!sessiz)tst('Önce bulut ayarını yapın','warn');return;}
-  if(mesgul){tekrar=true;return;}
-  mesgul=true;durum('⏳ gönderiliyor…');
-  try{
-    var veri=tumVeri(), son={};try{son=JSON.parse(ls(SON)||'{}')}catch(e){}
-    var yeni={}, islemler=[];
-    Object.keys(veri).forEach(function(k){var h=hash(veri[k]);yeni[k]=h;if(son[k]!==h)islemler.push({k:k,v:veri[k]});});
-    Object.keys(son).forEach(function(k){if(!(k in veri))islemler.push({k:k,v:null});});
-    if(!islemler.length){durum('✅ güncel');if(!sessiz)tst('☁️ Zaten güncel','ok');return;}
-    await postEt(c,islemler);
-    lw(SON,JSON.stringify(yeni));lw(ZAMAN,new Date().toISOString());
-    durum('✅ '+islemler.length+' kayıt gönderildi');
-    if(!sessiz)tst('☁️ '+islemler.length+' kayıt buluta gönderildi','ok');
-  }catch(e){
-    console.warn('[bulut]',e);durum('⚠️ hata: '+e.message);
-    if(!sessiz)tst('❌ Bulut hatası: '+e.message,'err');
-  }finally{
-    mesgul=false;
-    if(tekrar){tekrar=false;plan();}
-  }
-}
-
-function plan(){
-  if(ls(OTO)!=='1'||!cfg())return;
-  clearTimeout(timer);timer=setTimeout(function(){gonder(true)},8000);
-}
-
-async function cek(){
-  var c=cfg();if(!c){tst('Önce bulut ayarını yapın','warn');return;}
-  try{
-    durum('⏳ indiriliyor…');
-    var r=await fetch(c.url+(c.url.indexOf('?')>-1?'&':'?')+'t='+encodeURIComponent(c.token));
-    var j=await r.json();
-    if(!j.ok)throw new Error(j.hata||'sunucu hatası');
-    var v=j.veri||{},anahtarlar=Object.keys(v);
-    if(!anahtarlar.length){tst('Bulutta henüz veri yok','warn');durum('bulutta veri yok');return;}
-    if(!confirm('☁️ Bulutta '+anahtarlar.length+' kayıt var.\n\nBu cihazdaki TÜM veriler silinip bulut verisiyle değiştirilecek.\nÖnce güvenlik yedeği indirilecek. Devam edilsin mi?')){durum('iptal edildi');return;}
-    try{yedekAl();}catch(e){if(!confirm('Güvenlik yedeği alınamadı. Yine de devam?'))return;}
-    var kayitCfg=ls(CFG),kayitOto=ls(OTO);
-    localStorage.clear();
-    lw(CFG,kayitCfg);if(kayitOto)lw(OTO,kayitOto);
-    var son={};
-    anahtarlar.forEach(function(k){
-      if(k.indexOf('arsiv_')===0)_arsivCache[k]=v[k];
-      else if(_idbOnly(k))_bigCache[k]=v[k];
-      else _origLSSet(k,v[k]);
-      son[k]=hash(v[k]);
-    });
-    lw(SON,JSON.stringify(son));lw(ZAMAN,new Date().toISOString());
-    idbAc().then(function(db){
-      var tx=db.transaction(IDB_STORE,'readwrite'),st=tx.objectStore(IDB_STORE),k;
-      for(k in _arsivCache)st.put(_arsivCache[k],k);
-      for(k in _bigCache)st.put(_bigCache[k],k);
-      tx.oncomplete=function(){try{sessionStorage.setItem('_dbfYuklendi','1')}catch(e){}tst('✅ '+anahtarlar.length+' kayıt yüklendi — sayfa yenileniyor…','ok');setTimeout(function(){location.reload()},900);};
-      tx.onerror=function(){tst('❌ Yerel kayıt hatası','err')};
-    }).catch(function(e){console.warn('[bulut] IDB',e);tst('❌ Yerel kayıt hatası','err')});
-  }catch(e){console.warn('[bulut]',e);durum('⚠️ hata: '+e.message);tst('❌ Bulut hatası: '+e.message,'err');}
-}
-
-function ayarla(){
-  var c=cfg()||{};
-  var u=prompt('Apps Script Web uygulaması adresi (…/exec ile biter):',c.url||'');if(u===null)return;
-  var t=prompt('Gizli anahtar (Apps Script > Script properties > TOKEN değeri):',c.token||'');if(t===null)return;
-  u=u.trim();t=t.trim();
-  if(!/^https:\/\/script\.google\.com\/.+\/exec$/.test(u)){tst('Adres geçersiz görünüyor','warn');return;}
-  lw(CFG,JSON.stringify({url:u,token:t}));tst('☁️ Ayar kaydedildi','ok');durum('ayarlandı');
-}
-
-var panel=null,durumEl=null;
-function durum(m){if(durumEl)durumEl.textContent=m;}
-function panelAc(){
-  if(panel){panel.remove();panel=null;durumEl=null;return;}
-  panel=document.createElement('div');
-  panel.style.cssText='position:fixed;left:12px;bottom:12px;z-index:2147483000;background:#1b1f2a;color:#fff;border:1px solid #555;border-radius:10px;padding:12px;font:14px system-ui,sans-serif;width:260px;box-shadow:0 8px 30px #0008';
-  function btn(t,f){var b=document.createElement('button');b.textContent=t;b.style.cssText='display:block;width:100%;margin:6px 0;padding:8px;border:0;border-radius:6px;background:#2f6fed;color:#fff;font:inherit;cursor:pointer';b.onclick=f;panel.appendChild(b);return b;}
-  var h=document.createElement('div');h.textContent='☁️ Bulut Eşitleme';h.style.cssText='font-weight:700;margin-bottom:4px';panel.appendChild(h);
-  btn('⚙️ Adres / anahtar ayarla',ayarla);
-  btn('⬆️ Şimdi buluta gönder',function(){gonder(false)});
-  btn('⬇️ Buluttan yükle (bu cihazı değiştirir)',cek).style.background='#b4531c';
-  var o=btn('',function(){lw(OTO,ls(OTO)==='1'?'0':'1');yaz();plan();});
-  function yaz(){o.textContent=ls(OTO)==='1'?'🔁 Otomatik gönderme: AÇIK':'🔁 Otomatik gönderme: KAPALI';o.style.background=ls(OTO)==='1'?'#1f8a4c':'#555';}
-  yaz();
-  durumEl=document.createElement('div');durumEl.style.cssText='font-size:12px;opacity:.8;margin-top:4px';
-  var z=ls(ZAMAN);durumEl.textContent=(cfg()?'Ayarlı':'Ayar yok')+(z?' · son: '+new Date(z).toLocaleString('tr-TR'):'');
-  panel.appendChild(durumEl);
-  btn('Kapat',panelAc).style.background='#444';
-  document.body.appendChild(panel);
-}
-
-/* uygulamanın kendi kayıt çağrısına bağlan: her değişiklikte 8 sn sonra otomatik gönder */
-try{var _o=window.dbfKaydet;if(typeof _o==='function'){window.dbfKaydet=function(){var r=_o.apply(this,arguments);try{plan()}catch(e){}return r;};}}catch(e){}
-
-document.addEventListener('keydown',function(e){if(e.ctrlKey&&e.shiftKey&&(e.key==='B'||e.key==='b')){e.preventDefault();panelAc();}});
-if(location.hash==='#bulut')setTimeout(panelAc,800);
-window.bulutPanel=panelAc;
+function rnd(){var a=new Uint32Array(1);crypto.getRandomValues(a);return String(1000+a[0]%9000)}
+window.bulutPanel=function(){
+  var p=pins(),c=cfg(),rows=DAIRELER.map(function(d){return '<tr><td>'+d.no+'</td><td>'+esc(d.isim)+'</td><td><b>'+esc(p[d.no]||'—')+'</b></td></tr>'}).join('');
+  show('<h3>☁️ Sakin Girişi · Bulut</h3><input id="bcUrl" placeholder="Apps Script /exec adresi" value="'+esc(c.url||BULUT_URL)+'"><input id="bcKey" type="password" placeholder="Yönetici anahtarı (ADMIN_KEY)" value="'+esc(c.key||'')+'"><button onclick="bulutPinUret(false)">Eksik PIN\'leri üret</button><button class="g" onclick="bulutPinUret(true)">Hepsini yenile</button><button onclick="bulutGonder()">☁️ Buluta gönder</button><button class="g" onclick="skKapat()">Kapat</button><div class="sk-err" id="bcMsg"></div><table class="sk-tbl"><tr><td>No</td><td>Sakin</td><td>PIN</td></tr>'+rows+'</table>');
+};
+function kaydetCfg(){localStorage.setItem('bulutCfg',JSON.stringify({url:$('bcUrl').value.trim(),key:$('bcKey').value}))}
+window.bulutPinUret=function(hepsi){
+  if(hepsi&&!confirm('Tüm sakin PIN\'leri yenilenecek. Emin misiniz?'))return;
+  var p=pins();DAIRELER.forEach(function(d){if(hepsi||!p[d.no])p[d.no]=rnd()});
+  localStorage.setItem('sakinPinler',JSON.stringify(p));kaydetCfg();bulutPanel();
+};
+window.bulutGonder=function(){
+  kaydetCfg();var p=pins(),c=cfg();
+  var items=DAIRELER.filter(function(d){return p[d.no]}).map(function(d){return {no:d.no,pin:p[d.no],snap:snap(d)}});
+  if(!items.length){$('bcMsg').textContent='Önce PIN üretin.';return}
+  $('bcMsg').textContent='Gönderiliyor…';
+  api({act:'push',key:c.key,items:items}).then(function(r){$('bcMsg').textContent=r.ok?'✓ '+items.length+' daire buluta gönderildi.':'Hata: '+(r.err||'bilinmiyor')})
+   .catch(function(e){$('bcMsg').textContent=e.message});
+};
+// Yönetim paneline buton ekle
+var ab=document.querySelector('.admin-body');
+if(ab&&!$('bulutBar')){var b=document.createElement('div');b.id='bulutBar';b.style.cssText='margin:0 0 12px';
+  b.innerHTML='<button onclick="bulutPanel()" style="padding:9px 14px;border:0;border-radius:10px;background:#d4a627;font-weight:700;cursor:pointer">☁️ Sakin Girişi / Bulut</button>';ab.insertBefore(b,ab.firstChild)}
 })();
 </script>
+
 </body>
 </html>
